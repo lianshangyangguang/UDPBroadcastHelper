@@ -2,6 +2,9 @@ package com.gwell.view.library;
 
 import android.content.Context;
 import android.net.wifi.WifiManager;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
 import android.util.Log;
 
 import java.io.IOException;
@@ -13,34 +16,36 @@ import java.net.SocketException;
 
 public class UDPBroadcastHelper {
     public Boolean IsThreadDisable = false;
-    private final static String UDPHelper = "UDPHelper";
+    private final static String UDPBroadcastHelper = "UDPBroadcastHelper";
     public int port;
     InetAddress mInetAddress;
+    public Handler mHandler;
     MulticastSocket receiveSocket = null;
     MulticastSocket sendSocket = null;
-      private WeakReference<Context> mActivityReference;
+       public static final int RECEIVE_MSG_ERROR = 0x01;
+    public static final int RECEIVE_MSG_SUCCESS = 0x02;
+    private WeakReference<Context> mActivityReference;
     private WifiManager.MulticastLock lock;
     private boolean isStartSuccess = false;
-    private ReceiveDatagramPacket receiveData;
 
     public UDPBroadcastHelper(Context mContext) {
         mActivityReference = new WeakReference<>(mContext);
         WifiManager manager = (WifiManager) mActivityReference.get().getSystemService(Context.WIFI_SERVICE);
-        lock = manager.createMulticastLock(UDPHelper);
+        lock = manager.createMulticastLock(UDPBroadcastHelper);
     }
 
-        public ReceiveDatagramPacket receive(int port) {
+    ReceiveDatagramPacket receiveData;
+
+    public void receive(int port, Handler handler) {
         this.port = port;
+        this.mHandler = handler;
         //部分手机此处开始监听时会报异常，所以循环尝试开始监听
         new Thread() {
             @Override
             public void run() {
                 isStartSuccess = false;
                 while (!isStartSuccess) {
-                    receiveData = listen();
-                    if (receiveData.getState() == ReceiveDatagramPacket.RECEIVE_MSG_SUCCESS) {
-                        break;
-                    }
+                    listen();
                     try {
                         sleep(800);
                     } catch (InterruptedException e) {
@@ -49,11 +54,32 @@ public class UDPBroadcastHelper {
                 }
             }
         }.start();
-        return receiveData;
     }
 
-    private ReceiveDatagramPacket listen() {
-        ReceiveDatagramPacket receiveData = null;
+//    public void setCallBack(Handler handler) {
+//        this.mHandler = handler;
+//    }
+//
+//    //部分手机此处开始监听时会报异常，所以循环尝试开始监听
+//    public void StartListen() {
+//        new Thread() {
+//            @Override
+//            public void run() {
+//                isStartSuccess=false;
+//                while (!isStartSuccess){
+//                    listen();
+//                    try {
+//                        sleep(800);
+//                    } catch (InterruptedException e) {
+//                        e.printStackTrace();
+//                    }
+//                }
+//            }
+//        }.start();
+//    }
+
+
+    public void listen() {
         // 接收的字节大小，客户端发送的数据不能超过这个大小
         byte[] message = new byte[1024];
         try {
@@ -76,10 +102,48 @@ public class UDPBroadcastHelper {
                 receiveSocket.receive(datagramPacket);
                 mInetAddress = datagramPacket.getAddress();
                 byte[] data = datagramPacket.getData();
-                if (data[0] == 1) {
-                    receiveData = new ReceiveDatagramPacket(mInetAddress, data, ReceiveDatagramPacket.RECEIVE_MSG_SUCCESS);
+                if (data[0] == 1 && null != mHandler) {
+                    ReceiveDatagramPacket receiveData = new ReceiveDatagramPacket(mInetAddress, data);
+                    Message msg = new Message();
+                    msg.what = RECEIVE_MSG_SUCCESS;
+                    Bundle bundler = new Bundle();
+                    bundler.putSerializable("receiveData", receiveData);
+                    msg.setData(bundler);
+                    mHandler.sendMessage(msg);
                     break;
                 }
+//                int subType =0;
+//                int contactId = bytesToInt(data, 16);
+//                int rflag = bytesToInt(data, 12);
+//                int type = bytesToInt(data, 20);
+//                int frag = bytesToInt(data, 24);
+//                int curVersion = (rflag >> 4) & 0x1;
+//                if (curVersion == 1) {
+//                    subType = bytesToInt(data, 80);
+//                }
+//                if (data[0] == 1) {
+//                    if (null != mHandler) {
+//                        Message msg = new Message();
+//                        msg.what = RECEIVE_MSG_SUCCESS;
+//                        Bundle bundler = new Bundle();
+//                        bundler.putString("contactId",
+//                                String.valueOf(contactId));
+//                        bundler.putString("frag", String.valueOf(frag));
+//                        String ip_address = mInetAddress.getHostAddress();
+//                        bundler.putString(
+//                                "ipFlag",
+//                                ip_address.substring(
+//                                        ip_address.lastIndexOf(".") + 1,
+//                                        ip_address.length()));
+//                        bundler.putString("ip", ip_address);
+//                        bundler.putInt("type", type);
+//                        bundler.putInt("rflag", rflag);
+//                        bundler.putInt("subType", subType);
+//                        msg.setData(bundler);
+//                        mHandler.sendMessage(msg);
+//                        break;
+//                    }
+//                }
                 MulticastUnLock();
             }
         } catch (SocketException e) {
@@ -88,8 +152,9 @@ public class UDPBroadcastHelper {
         } catch (Exception e) {
             e.printStackTrace();
             IsThreadDisable = true;
-            receiveData = new ReceiveDatagramPacket(ReceiveDatagramPacket.RECEIVE_MSG_ERROR);
-
+            if (null != mHandler) {
+                mHandler.sendEmptyMessage(RECEIVE_MSG_ERROR);
+            }
         } finally {
             MulticastUnLock();
             if (null != receiveSocket) {
@@ -97,8 +162,8 @@ public class UDPBroadcastHelper {
                 receiveSocket = null;
             }
         }
-        return receiveData;
     }
+
 
     public void StopListen() {
         this.IsThreadDisable = true;
