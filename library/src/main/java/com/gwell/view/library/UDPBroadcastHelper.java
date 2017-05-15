@@ -149,6 +149,7 @@ public class UDPBroadcastHelper {
                 isStartSuccess = false;
                 while (!isStartSuccess) {
                     try {
+                        sendSocket = new MulticastSocket(port);
                         DatagramPacket dp = new DatagramPacket(message.getBytes(), message.length(), InetAddress.getByName("255.255.255.255"), port);
                         MulticastLock();
                         sendSocket.setBroadcast(true);
