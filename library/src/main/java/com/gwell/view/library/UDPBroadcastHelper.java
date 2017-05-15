@@ -142,18 +142,14 @@ public class UDPBroadcastHelper {
         }
     }
 
-    public void send(final String host, final int port, final String message,final Handler handler) {
+    public void send( final int port, final String message,final Handler handler) {
         new Thread() {
             @Override
             public void run() {
                 isStartSuccess = false;
                 while (!isStartSuccess) {
                     try {
-                        InetAddress group = InetAddress.getByName(host);
-                        sendSocket = new MulticastSocket();
-                        //加入多播组
-                        sendSocket.joinGroup(group);
-                        DatagramPacket dp = new DatagramPacket(message.getBytes(), message.length(), group, port);
+                        DatagramPacket dp = new DatagramPacket(message.getBytes(), message.length(), InetAddress.getByName("255.255.255.255"), port);
                         MulticastLock();
                         sendSocket.setBroadcast(true);
                         sendSocket.setSoTimeout(120 * 1000);
