@@ -3,8 +3,6 @@ package com.gwell.view.library;
 import android.content.Context;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Message;
 import android.util.Log;
 
 import java.io.IOException;
@@ -19,7 +17,6 @@ public class UDPBroadcastHelper {
     private final static String UDPBroadcastHelper = "UDPBroadcastHelper";
     public int port;
     InetAddress mInetAddress;
-    public Handler mHandler;
     MulticastSocket receiveSocket = null;
     MulticastSocket sendSocket = null;
     public static final int RECEIVE_MSG_ERROR = 0x01;
@@ -29,6 +26,7 @@ public class UDPBroadcastHelper {
     private WeakReference<Context> mActivityReference;
     private WifiManager.MulticastLock lock;
     private boolean isStartSuccess = false;
+    private OnReceive onReceive;
 
     public UDPBroadcastHelper(Context mContext) {
         mActivityReference = new WeakReference<>(mContext);
@@ -38,9 +36,17 @@ public class UDPBroadcastHelper {
 
     ReceiveDatagramPacket receiveData;
 
-    public void receive(int port, Handler handler) {
+    public interface OnReceive{
+        void onReceive(int state,Bundle data);
+    }
+
+    public interface OnSend{
+        void onSend(int state);
+    }
+
+    public void receive(int port, OnReceive onReceive) {
         this.port = port;
-        this.mHandler = handler;
+        this.onReceive = onReceive;
         //部分手机此处开始监听时会报异常，所以循环尝试开始监听
         new Thread() {
             @Override
@@ -81,14 +87,11 @@ public class UDPBroadcastHelper {
                 receiveSocket.receive(datagramPacket);
                 mInetAddress = datagramPacket.getAddress();
                 byte[] data = datagramPacket.getData();
-                if (data[0] == 1 && null != mHandler) {
+                if (data[0] == 1 && null != onReceive) {
                     ReceiveDatagramPacket receiveData = new ReceiveDatagramPacket(mInetAddress, data);
-                    Message msg = new Message();
-                    msg.what = RECEIVE_MSG_SUCCESS;
                     Bundle bundler = new Bundle();
                     bundler.putSerializable("receiveData", receiveData);
-                    msg.setData(bundler);
-                    mHandler.sendMessage(msg);
+                    onReceive.onReceive(RECEIVE_MSG_SUCCESS,bundler);
                     break;
                 }
                 MulticastUnLock();
@@ -100,8 +103,8 @@ public class UDPBroadcastHelper {
             e.printStackTrace();
             Log.d("zxy", "listen: "+e.toString());
             IsThreadDisable = true;
-            if (null != mHandler) {
-                mHandler.sendEmptyMessage(RECEIVE_MSG_ERROR);
+            if (null != onReceive) {
+                onReceive.onReceive(RECEIVE_MSG_ERROR,null);
             }
         } finally {
             MulticastUnLock();
@@ -142,7 +145,7 @@ public class UDPBroadcastHelper {
         }
     }
 
-    public void send( final int port, final String message,final Handler handler) {
+    public void send( final int port, final String message,final OnSend onSend) {
         new Thread() {
             @Override
             public void run() {
@@ -157,13 +160,13 @@ public class UDPBroadcastHelper {
                         isStartSuccess = true;
                         sendSocket.send(dp);
                         sendSocket.close();
-                        handler.sendEmptyMessage(SEND_MSG_SUCCESS);
+                        onSend.onSend(SEND_MSG_SUCCESS);
                     } catch (SocketException e) {
                         e.printStackTrace();
                     } catch (IOException e) {
                         e.printStackTrace();
                         Log.d("zxy", "sendError: "+e.toString());
-                        handler.sendEmptyMessage(SEND_MSG_ERROR);
+                        onSend.onSend(SEND_MSG_ERROR);
                     } finally {
                         MulticastUnLock();
                         if (null != sendSocket) {
@@ -181,4 +184,5 @@ public class UDPBroadcastHelper {
         }.start();
 
     }
+
 }
