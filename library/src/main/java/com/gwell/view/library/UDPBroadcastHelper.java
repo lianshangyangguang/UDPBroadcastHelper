@@ -13,7 +13,6 @@ import java.net.DatagramPacket;
 import java.net.InetAddress;
 import java.net.MulticastSocket;
 import java.net.SocketException;
-import java.util.Arrays;
 
 public class UDPBroadcastHelper {
     public Boolean IsThreadDisable = false;
@@ -82,8 +81,6 @@ public class UDPBroadcastHelper {
                 receiveSocket.receive(datagramPacket);
                 mInetAddress = datagramPacket.getAddress();
                 byte[] data = datagramPacket.getData();
-                Log.d("zxy", "listen: "+ Arrays.toString(data));
-
                 if (data[0] == 1 && null != mHandler) {
                     ReceiveDatagramPacket receiveData = new ReceiveDatagramPacket(mInetAddress, data);
                     Message msg = new Message();
@@ -101,6 +98,7 @@ public class UDPBroadcastHelper {
             //如果是此异常，isStartSuccess没有置为true，还会重新监听，所以这里不处理
         } catch (Exception e) {
             e.printStackTrace();
+            Log.d("zxy", "listen: "+e.toString());
             IsThreadDisable = true;
             if (null != mHandler) {
                 mHandler.sendEmptyMessage(RECEIVE_MSG_ERROR);
