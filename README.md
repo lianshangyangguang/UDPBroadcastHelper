@@ -22,5 +22,4 @@ UDPBroadcastHelper mHelper = new UDPBroadcastHelper(context);
  if (mHelper != null) {
             mHelper.StopListen();
         }
-···        
-        
+···          
