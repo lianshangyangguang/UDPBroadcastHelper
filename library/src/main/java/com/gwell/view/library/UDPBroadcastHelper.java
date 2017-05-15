@@ -25,6 +25,8 @@ public class UDPBroadcastHelper {
     MulticastSocket sendSocket = null;
     public static final int RECEIVE_MSG_ERROR = 0x01;
     public static final int RECEIVE_MSG_SUCCESS = 0x02;
+    public static final int SEND_MSG_SUCCESS = 0x03;
+    public static final int SEND_MSG_ERROR = 0x04;
     private WeakReference<Context> mActivityReference;
     private WifiManager.MulticastLock lock;
     private boolean isStartSuccess = false;
@@ -142,7 +144,7 @@ public class UDPBroadcastHelper {
         }
     }
 
-    public void send(final String host, final int port, final String message) {
+    public void send(final String host, final int port, final String message,final Handler handler) {
         new Thread() {
             @Override
             public void run() {
@@ -160,10 +162,12 @@ public class UDPBroadcastHelper {
                         isStartSuccess = true;
                         sendSocket.send(dp);
                         sendSocket.close();
+                        handler.sendEmptyMessage(SEND_MSG_SUCCESS);
                     } catch (SocketException e) {
                         e.printStackTrace();
                     } catch (IOException e) {
                         e.printStackTrace();
+                        handler.sendEmptyMessage(SEND_MSG_ERROR);
                     } finally {
                         MulticastUnLock();
                         if (null != sendSocket) {
