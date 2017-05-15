@@ -165,6 +165,7 @@ public class UDPBroadcastHelper {
                         e.printStackTrace();
                     } catch (IOException e) {
                         e.printStackTrace();
+                        Log.d("zxy", "sendError: "+e.toString());
                         handler.sendEmptyMessage(SEND_MSG_ERROR);
                     } finally {
                         MulticastUnLock();
