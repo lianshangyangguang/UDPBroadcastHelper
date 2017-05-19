@@ -11,10 +11,25 @@ android {
         versionCode 1
         versionName "1.0"
     }
+    signingConfigs {
+        releaseConfig {
+            keyAlias 'gwell2012'
+            keyPassword 'gwell2012'
+            storeFile file('E:\\new-keystore\\udp.jks')
+            storePassword 'gwell2012'
+        }
+        config {
+            keyAlias 'gwell2012'
+            keyPassword 'gwell2012'
+            storeFile file('E:/new-keystore/udp.jks')
+            storePassword 'gwell2012'
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            zipAlignEnabled true
         }
     }
 }
