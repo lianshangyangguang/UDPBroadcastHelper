@@ -3,6 +3,8 @@ package com.gwell.view.library;
 import android.content.Context;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
 import android.util.Log;
 
 import java.io.IOException;
@@ -27,6 +29,7 @@ public class UDPBroadcastHelper {
     private WifiManager.MulticastLock lock;
     private boolean isStartSuccess = false;
     private OnReceive onReceive;
+    private OnSend onSend;
 
     public UDPBroadcastHelper(Context mContext) {
         mActivityReference = new WeakReference<>(mContext);
@@ -36,11 +39,11 @@ public class UDPBroadcastHelper {
 
     ReceiveDatagramPacket receiveData;
 
-    public interface OnReceive{
-        void onReceive(int state,Bundle data);
+    public interface OnReceive {
+        void onReceive(int state, Bundle data);
     }
 
-    public interface OnSend{
+    public interface OnSend {
         void onSend(int state);
     }
 
@@ -63,6 +66,32 @@ public class UDPBroadcastHelper {
             }
         }.start();
     }
+
+    Handler handler = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+            super.handleMessage(msg);
+            switch (msg.what) {
+                case RECEIVE_MSG_SUCCESS:
+                    if (onReceive != null) {
+                        Bundle bundler = msg.getData();
+                        onReceive.onReceive(RECEIVE_MSG_SUCCESS, bundler);
+                    }
+                    break;
+                case RECEIVE_MSG_ERROR:
+                    if (onReceive != null) {
+                        onReceive.onReceive(RECEIVE_MSG_ERROR, null);
+                    }
+                    break;
+                case SEND_MSG_SUCCESS:
+                    onSend.onSend(SEND_MSG_SUCCESS);
+                    break;
+                case SEND_MSG_ERROR:
+                    onSend.onSend(SEND_MSG_ERROR);
+                    break;
+            }
+        }
+    };
 
     public void listen() {
         // 接收的字节大小，客户端发送的数据不能超过这个大小
@@ -91,7 +120,10 @@ public class UDPBroadcastHelper {
                     ReceiveDatagramPacket receiveData = new ReceiveDatagramPacket(mInetAddress, data);
                     Bundle bundler = new Bundle();
                     bundler.putSerializable("receiveData", receiveData);
-                    onReceive.onReceive(RECEIVE_MSG_SUCCESS,bundler);
+                    Message msg = handler.obtainMessage();
+                    msg.what = RECEIVE_MSG_SUCCESS;
+                    msg.setData(bundler);
+                    handler.sendMessage(msg);
                     break;
                 }
                 MulticastUnLock();
@@ -101,10 +133,10 @@ public class UDPBroadcastHelper {
             //如果是此异常，isStartSuccess没有置为true，还会重新监听，所以这里不处理
         } catch (Exception e) {
             e.printStackTrace();
-            Log.d("zxy", "listen: "+e.toString());
+            Log.d("zxy", "listen: " + e.toString());
             IsThreadDisable = true;
             if (null != onReceive) {
-                onReceive.onReceive(RECEIVE_MSG_ERROR,null);
+                handler.sendEmptyMessage(RECEIVE_MSG_ERROR);
             }
         } finally {
             MulticastUnLock();
@@ -145,7 +177,8 @@ public class UDPBroadcastHelper {
         }
     }
 
-    public void send( final int port, final String message,final OnSend onSend) {
+    public void send(final int port, final String message, final OnSend onSend) {
+        this.onSend = onSend;
         new Thread() {
             @Override
             public void run() {
@@ -160,13 +193,17 @@ public class UDPBroadcastHelper {
                         isStartSuccess = true;
                         sendSocket.send(dp);
                         sendSocket.close();
-                        onSend.onSend(SEND_MSG_SUCCESS);
+                        if (onSend != null) {
+                            handler.sendEmptyMessage(SEND_MSG_SUCCESS);
+                        }
                     } catch (SocketException e) {
                         e.printStackTrace();
                     } catch (IOException e) {
                         e.printStackTrace();
-                        Log.d("zxy", "sendError: "+e.toString());
-                        onSend.onSend(SEND_MSG_ERROR);
+                        Log.d("zxy", "sendError: " + e.toString());
+                        if (onSend != null) {
+                            handler.sendEmptyMessage(SEND_MSG_ERROR);
+                        }
                     } finally {
                         MulticastUnLock();
                         if (null != sendSocket) {
