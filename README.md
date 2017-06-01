@@ -9,13 +9,13 @@ UDPBroadcastHelper mHelper = new UDPBroadcastHelper(context);
 ```
 2.接收
 ```
- //参数：端口号，发送处理handler
- mHelper.receive(9988, handle);
+ //参数：端口号，接收处理回调OnReceive
+ mHelper.receive(9988, onReceive);
  ```
 3.发送
 ```
-//参数：端口号，发送的消息，发送处理handler
- mHelper.send(port,msg,handler);
+//参数：端口号，发送的消息，发送处理回调OnSend
+ mHelper.send(port,msg,onSend);
  ```
 4.关闭资源
 ```
